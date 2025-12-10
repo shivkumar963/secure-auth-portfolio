@@ -1,8 +1,12 @@
 const mongoose = require('mongoose');
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://0.0.0.0/men';
+// Dono naam support karenge: MONGO_URI ya MONGODB_URI
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  process.env.MONGODB_URI ||   // <- ye line add
+  'mongodb://0.0.0.0/men';
 
-const connection = mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI)
   .then(() => {
     console.log("✅ Connected to Database");
   })
@@ -10,4 +14,4 @@ const connection = mongoose.connect(MONGO_URI)
     console.error("❌ Error in Database", err);
   });
 
-module.exports = connection;
+module.exports = mongoose;
