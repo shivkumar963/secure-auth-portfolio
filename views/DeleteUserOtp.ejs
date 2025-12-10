@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel="stylesheet" href="style.css">
+  <title>Confirm Delete Account</title>
+</head>
+<body>
+
+  <h2>Confirm Account Deletion</h2>
+
+  <% if (error) { %>
+    <p style="color:red;"><%= error %></p>
+  <% } %>
+
+  <% if (message) { %>
+    <p style="color:green;"><%= message %></p>
+  <% } %>
+
+  <form action="/delete-user/otp" method="POST">
+    <input type="hidden" name="email" value="<%= email %>" />
+
+    <label>OTP</label>
+    <input type="text" name="otp" required />
+
+    <button type="submit">Delete My Account</button>
+  </form>
+
+</body>
+</html>

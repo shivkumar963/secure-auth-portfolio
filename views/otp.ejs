@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+  <title>OTP Verification</title>
+</head>
+<body>
+
+  <h2>OTP Verification</h2>
+
+  <% if (message) { %>
+    <p style="color:red;"><%= message %></p>
+  <% } %>
+
+  <form action="/otp-verify" method="POST">
+    <!-- email hidden -->
+    <input type="hidden" name="email" value="<%= email %>" />
+
+    <label>Enter OTP:</label>
+    <!-- ⚠️ YAHI sabse important line -->
+    <input type="text" name="otp" placeholder="6 digit OTP" required />
+
+    <button type="submit">Verify OTP</button>
+  </form>
+
+</body>
+</html>

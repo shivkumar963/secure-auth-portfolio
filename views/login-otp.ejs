@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="style.css">
+  <title>Login OTP Verification</title>
+</head>
+<body>
+
+  <h2>Login OTP Verification</h2>
+
+  <% if (message) { %>
+    <p style="color:red;"><%= message %></p>
+  <% } %>
+
+  <form action="/login-otp" method="POST">
+    <label for="otp">Enter OTP:</label>
+    <input type="text" id="otp" name="otp" required />
+    <button type="submit">Verify & Continue</button>
+  </form>
+
+</body>
+</html>

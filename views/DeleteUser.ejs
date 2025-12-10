@@ -1,0 +1,47 @@
+<html>
+<head> 
+    <title>
+        Forgot Password
+    </title>
+    <style>
+  	body {
+  background: #f0f0f0;
+  font-family: sans-serif;
+}
+.form-container {
+  width: 300px;
+  margin: 80px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+form input, form button {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+}
+form button {
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+form button:hover {
+  background: #0056b3;
+}
+  	</style>
+</head>
+   </head>
+<body>
+  <div class="form-container">
+    <h2>Delete Account</h2>
+    <form action="/delete-user" method="POST">
+      <input type="text" name="username" placeholder="Enter your Username" required />
+      <input type="email" name="email" placeholder="Enter your Email" required />
+      <input type="password" name="password" placeholder="Enter Password" required/>
+      <button type="submit">Delet Account</button>
+    </form>
+  </div>
+</body>
+</html>
