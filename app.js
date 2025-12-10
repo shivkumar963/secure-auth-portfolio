@@ -105,7 +105,7 @@ app.use(express.static("public", {
 app.set("view engine", 'ejs');
 // 👇 yeh line app.set("view engine", 'ejs'); ke baad kahin upar side me daal de
 app.get('/', (req, res) => {
-  res.redirect('/login',{message: null });   // ya direct res.render('index', { message: null });
+  res.redirect('/login');   // ya direct res.render('index', { message: null });
 });
 
 // Optional debug logs
