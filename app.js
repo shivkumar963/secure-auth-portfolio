@@ -105,7 +105,7 @@ app.use(express.static("public", {
 app.set("view engine", 'ejs');
 // 👇 yeh line app.set("view engine", 'ejs'); ke baad kahin upar side me daal de
 app.get('/', (req, res) => {
-  res.redirect('/login');   // ya direct res.render('index', { message: null });
+  res.redirect('/login',{message: null });   // ya direct res.render('index', { message: null });
 });
 
 // Optional debug logs
@@ -142,7 +142,13 @@ async function sendOTPEmail(email, otp) {
     `
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log("✅ OTP mail sent to:", email);
+  } catch (err) {
+    console.error("Mail send error:", err);
+    // ⚠️ Yahan error throw mat kar, sirf log kar
+  }
 }
 
 // ---------------- Logger (internal use only) ----------------
@@ -392,12 +398,14 @@ app.post('/register', async (req, res) => {
   try {
     const { username, email, password, dob, gender } = req.body;
 
+    // 🔹 Basic validation
     if (!username || !email || !password || password.length < 8) {
       return res.status(400).render('register', {
         message: 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए और सभी fields भरें'
       });
     }
 
+    // 🔹 Email already exist check
     const existingUser = await userModel.findOne({ email });
     if (existingUser) {
       return res.status(400).render('register', {
@@ -405,20 +413,14 @@ app.post('/register', async (req, res) => {
       });
     }
 
+    // 🔹 Password hash
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // 🔹 OTP generate
     const otp = generateOTP();
     console.log("Register OTP for", email, ":", otp);
 
-    try {
-      await sendOTPEmail(email, otp);
-    } catch (mailErr) {
-      console.error("Mail send error:", mailErr);
-      return res.status(500).render('register', {
-        message: 'OTP email bhejne me dikkat aayi, baad me try karein'
-      });
-    }
-
+    // 1️⃣ Pehle user ko DB me save karo (email ka wait nahi)
     await userModel.create({
       username,
       email,
@@ -426,20 +428,26 @@ app.post('/register', async (req, res) => {
       dob,
       gender,
       otp: otp,
-      otpExpires: Date.now() + 10 * 60 * 1000,
+      otpExpires: Date.now() + 10 * 60 * 1000, // 10 min
       isVerified: false
     });
 
-    return res.redirect(`/otp-verify?email=${email}`);
+    // 2️⃣ Turant user ko OTP page par bhejo (fast response)
+    res.redirect(`/otp-verify?email=${email}`);
+
+    // 3️⃣ Email background me bhejo (await nahi kar rahe)
+    // agar yahan timeout bhi ho gaya to bhi user ka flow break nahi hoga
+    sendOTPEmail(email, otp).catch(mailErr => {
+      console.error("Background mail error:", mailErr);
+    });
 
   } catch (error) {
-    console.error(error);
+    console.error("Register error:", error);
     res.status(500).render('register', {
       message: 'रजिस्ट्रेशन असफल, कृपया फिर से प्रयास करें'
     });
   }
 });
-
 // ---------------- Routes: Forgot Password + OTP ----------------
 
 app.post('/Forgotpassword', async (req, res) => {
