@@ -31,7 +31,7 @@ app.use(morgan('dev'));
 // ✅ Rate limit (global)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   message: "Too many attempts. Try later."
 });
 app.use(limiter);
