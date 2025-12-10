@@ -130,6 +130,16 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendOTPEmail(email, otp) {
+  // Har jagah log kar, taaki tu OTP dekh sake
+  console.log(`📨 OTP for ${email}: ${otp}`);
+
+  // Agar production (Render) pe ho, to abhi ke liye sirf log, mail mat bhej
+  if (process.env.NODE_ENV === 'production') {
+    console.log("ℹ️ Production mode: Skipping real email send, using logs only.");
+    return;
+  }
+
+  // Localhost / development pe actual email bhejna
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -147,7 +157,6 @@ async function sendOTPEmail(email, otp) {
     console.log("✅ OTP mail sent to:", email);
   } catch (err) {
     console.error("Mail send error:", err);
-    // ⚠️ Yahan error throw mat kar, sirf log kar
   }
 }
 
