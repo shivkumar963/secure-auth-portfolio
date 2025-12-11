@@ -108,7 +108,16 @@ app.get('/protected-route', (req, res) => {
   res.render('home', { email });  
 });
 
+app.get('/',(req, res) =>{
+    res.render('index')
+});
 
+app.get('/Contact',(req, res) =>{
+    res.render('contact')
+});
+app.get('/service',(req, res) =>{
+    res.render('contact')
+});
 
 app.get('/delete-user',(req, res) =>{
     res.render('DeleteUser')
