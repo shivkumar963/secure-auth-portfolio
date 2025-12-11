@@ -12,7 +12,6 @@ const dbConnection = require('./config/db'); // अगर ये connect कर 
 const userModel = require('./User');
 
 require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
-connectDB();
 
 const app = express();
 
