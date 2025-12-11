@@ -1,20 +1,22 @@
+// config/db.js
+require('dotenv').config();
 const mongoose = require('mongoose');
 
-const mongoUrl = process.env.MONGO_URL || process.env.MONGO_URI || process.env.MONGODB_URL;
-
-if (!mongoUrl) {
-  console.error('❌ MONGO URL missing. Set MONGO_URL in .env');
+const MONGO_URL = process.env.MONGO_URL;
+if (!MONGO_URL) {
+  console.error("❌ MONGO_URL missing in .env");
   process.exit(1);
 }
 
-async function connectDB() {
-  try {
-    await mongoose.connect(mongoUrl); // options not needed in mongoose v6+
-    console.log('✅ MongoDB Connected Successfully');
-  } catch (err) {
-    console.error('❌ MongoDB Connection Failed:', err.message || err);
-    process.exit(1);
-  }
-}
+mongoose.connect(MONGO_URL, {
+  // NOTE: new mongoose versions don't need these; but harmless to include
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  // serverSelectionTimeoutMS: 5000 // optional: fail fast
+}).then(() => {
+  console.log("✅ Connected to Database");
+}).catch(err => {
+  console.error("❌ MongoDB Connection Failed:", err);
+});
 
-module.exports = connectDB;
+module.exports = mongoose;
