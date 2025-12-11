@@ -1,12 +1,15 @@
+// config/db.js
 const mongoose = require('mongoose');
 
-// Dono naam support karenge: MONGO_URI ya MONGODB_URI
-const MONGO_URI =
-  process.env.MONGO_URI ||
-  process.env.MONGODB_URI ||   // <- ye line add
-  'mongodb://0.0.0.0/men';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://0.0.0.0:27017/men';
 
-mongoose.connect(MONGO_URI)
+const options = {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 10000
+};
+
+mongoose.connect(MONGO_URI, options)
   .then(() => {
     console.log("✅ Connected to Database");
   })

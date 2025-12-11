@@ -16,13 +16,12 @@ const rateLimit = require('express-rate-limit');
 
 const dotenv=require('dotenv');
 
-const dbConnection=require('./config/db');
 
 const userModel = require('./User');
 
 
-require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
-
+require('dotenv').config();
+const dbConnection=require('./config/db');
 const app=express();
 
 app.set('trust proxy', true); 
@@ -31,7 +30,10 @@ app.use(helmet());
 
 app.use(morgan('dev'));
 
-
+app.get('/db-status', (req, res) => {
+  const state = require('./config/db').connection?.readyState;
+  res.json({ readyState: state }); // 0=disconnected,1=connected
+});
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
