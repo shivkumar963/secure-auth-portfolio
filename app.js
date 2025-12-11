@@ -25,18 +25,30 @@ require('dotenv').config();
 
 const app=express();
 
-app.set('trust proxy', true); 
-
 app.use(helmet());
 
 app.use(morgan('dev'));
 
-
+// ---------------- safer trust proxy + rate limit ----------------
+/*
+ If app runs behind one proxy (eg. Render, Heroku), set trust proxy = 1
+ Do NOT set it boolean true (express-rate-limit will complain).
+*/
+app.set('trust proxy', 1); // number 1 is safe for single-proxy hosting
 
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000,
-  message: "Too many attempts. Try later."
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,                 // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  // keyGenerator: use x-forwarded-for first then socket ip (safer)
+  keyGenerator: (req) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    if (forwarded) return forwarded.split(',')[0].trim();
+    return req.ip || req.socket.remoteAddress || 'unknown';
+  },
+  skipFailedRequests: true, // optional: don't count failed responses
+  message: "Too many requests from your IP, try again later."
 });
 
 app.use(limiter);
@@ -53,16 +65,6 @@ app.use(session({
     maxAge: 1000 * 60 * 1
   }
 }));
-
-app.use((req, res, next) => {
-  const ip =
-    req.headers['x-forwarded-for']?.split(',')[0] ||
-    req.socket.remoteAddress;
-
-  req.clientIP = ip;           
-  console.log("Client IP:", ip);      
-  next();
-});
 
 
 app.use(express.urlencoded({extended: true}));
