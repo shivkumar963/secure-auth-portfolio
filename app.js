@@ -15,35 +15,40 @@ require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
 
 const app = express();
 
+
+// session setup
+const MongoStore = require("connect-mongo")(session);
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || "change_this",
+  resave: false,
+  saveUninitialized: false,
+  store: new MongoStore({
+    url: process.env.MONGO_URL,  // <-- यही तेरा Atlas URL है
+    ttl: 14 * 24 * 60 * 60       // 14 days
+  }),
+  cookie: {
+    secure: false,              // Render पर true कर देना (HTTPS)
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60      // 1 hour
+  }
+}));
+
 // अगर behind proxy (Heroku/Render) तो true रहे
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(morgan('dev'));
 
 // rate limiter (default)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: 15 * 60 * 1500, // 15 minutes
+  max: 1000,
   message: "Too many requests, try again later."
 });
 app.use(limiter);
 
 app.use(cookieParser());
-
-// session idle = 1 minute (60000 ms)
-const SESSION_IDLE_TIME = 1000 * 60 * 1; // 1 minute
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'PwV/rFdgg8qA0qISYF8Y8WbeM/U7XfV2EasvAKYprUg',
-  resave: false,
-  saveUninitialized: false,
-  rolling: true, // हर request पर cookie का expiry reset करेगा
-  cookie: {
-    secure: false, // production में true कर देना (https)
-    httpOnly: true,
-    maxAge: SESSION_IDLE_TIME
-  }
-}));
 
 // helper: client IP
 app.use((req, res, next) => {
