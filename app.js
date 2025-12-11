@@ -12,6 +12,7 @@ const dbConnection = require('./config/db'); // अगर ये connect कर 
 const userModel = require('./User');
 
 require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
+connectDB();
 
 const app = express();
 
@@ -34,7 +35,7 @@ app.use(cookieParser());
 // session idle = 1 minute (60000 ms)
 const SESSION_IDLE_TIME = 1000 * 60 * 1; // 1 minute
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'change_this_secret',
+  secret: process.env.SESSION_SECRET || 'PwV/rFdgg8qA0qISYF8Y8WbeM/U7XfV2EasvAKYprUg',
   resave: false,
   saveUninitialized: false,
   rolling: true, // हर request पर cookie का expiry reset करेगा
@@ -116,6 +117,18 @@ app.get('/login', (req, res) => {
   res.render('index', { message: res.locals.message || null });
 });
 
+// DEBUG route - remove after testing
+app.get('/__debug_users', async (req, res) => {
+  try {
+    const docs = await userModel.find().limit(20).lean();
+    console.log('DEBUG /__debug_users count:', docs.length);
+    res.json({ count: docs.length, docs });
+  } catch (err) {
+    console.error('DEBUG fetch users error', err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 app.get('/register', (req, res) => {
   if (req.session && req.session.user) return res.redirect('/home');
   res.render('register', { message: res.locals.message || null });
@@ -157,21 +170,33 @@ app.get('/protected-route', (req, res) => {
 // ----------------- Register -----------------
 app.post('/register', async (req, res) => {
   try {
-    const { username, email, password, dob, gender } = req.body;
+    // sanitize + normalize
+    let { username, email, password, dob, gender } = req.body || {};
+    username = (username || '').trim();
+    email = (email || '').trim().toLowerCase();
+    password = password || '';
+
+    console.log('Register attempt:', { username, email, dob, gender });
 
     // validation
-    if (!username || !email || !password || password.length < 8) {
-      req.session.message = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए और सभी fields भरें';
+    if (!username || !email || !password) {
+      req.session.message = 'सभी fields भरें';
+      return res.redirect('/register');
+    }
+    if (password.length < 8) {
+      req.session.message = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
       return res.redirect('/register');
     }
 
+    // check existing
     const existingUser = await userModel.findOne({ email });
     if (existingUser) {
-      // email already registered -> redirect to login
+      // अगर ईमेल पहले से है -> यूजर को लॉगिन पर भेजो
       req.session.message = 'यह ईमेल पहले से रजिस्टर्ड है — कृपया लॉगिन करें';
       return res.redirect('/login');
     }
 
+    // hash and create
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await userModel.create({
@@ -180,23 +205,37 @@ app.post('/register', async (req, res) => {
       password: hashedPassword,
       dob,
       gender,
-      isVerified: true // OTP नहीं चाहिए तो true
+      isVerified: true
     });
 
+    console.log('User created:', newUser._id);
+
+    // set session and redirect
     req.session.user = {
       id: newUser._id,
       username: newUser.username,
       email: newUser.email
     };
 
-    return res.redirect('/home');
+    // save session (optional, but good for safety) then redirect
+    req.session.save(err => {
+      if (err) {
+        console.error('Session save error after register:', err);
+        // phir bhi home bhej de
+        return res.redirect('/home');
+      }
+      return res.redirect('/home');
+    });
 
   } catch (error) {
     console.error('Register error:', error);
-    if (error.code === 11000) {
+
+    // duplicate key from mongoose (race)
+    if (error && error.code === 11000) {
       req.session.message = 'ईमेल पहले से मौजूद है';
       return res.redirect('/login');
     }
+
     req.session.message = 'रजिस्ट्रेशन असफल, कृपया फिर से प्रयास करें';
     return res.redirect('/register');
   }
