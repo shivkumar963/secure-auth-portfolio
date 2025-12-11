@@ -1,113 +1,129 @@
-const express=require('express');
-
+const express = require('express');
 const session = require('express-session');
-
-const mongoose=require('mongoose');
-
-const bcrypt=require('bcrypt');
-
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
-
 const helmet = require('helmet');
-
-const morgan=require('morgan');
-
+const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const dotenv = require('dotenv');
 
-const dotenv=require('dotenv');
-
-const dbConnection=require('./config/db');
-
+const dbConnection = require('./config/db'); // अगर ये connect कर रहा है तो ठीक है
 const userModel = require('./User');
 
+require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
 
-require('dotenv').config();
+const app = express();
 
-const app=express();
+// अगर behind proxy (Heroku/Render) तो true रहे
+app.set('trust proxy', true);
 
 app.use(helmet());
-
 app.use(morgan('dev'));
 
-// ---------------- safer trust proxy + rate limit ----------------
-/*
- If app runs behind one proxy (eg. Render, Heroku), set trust proxy = 1
- Do NOT set it boolean true (express-rate-limit will complain).
-*/
-app.set('trust proxy', 1); // number 1 is safe for single-proxy hosting
-
+// rate limiter (default)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,                 // limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  // keyGenerator: use x-forwarded-for first then socket ip (safer)
-  keyGenerator: (req) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    if (forwarded) return forwarded.split(',')[0].trim();
-    return req.ip || req.socket.remoteAddress || 'unknown';
-  },
-  skipFailedRequests: true, // optional: don't count failed responses
-  message: "Too many requests from your IP, try again later."
+  max: 100,
+  message: "Too many requests, try again later."
 });
-
 app.use(limiter);
 
 app.use(cookieParser());
 
+// session idle = 1 minute (60000 ms)
+const SESSION_IDLE_TIME = 1000 * 60 * 1; // 1 minute
 app.use(session({
-  secret: process.env.SESSION_SECRET, 
+  secret: process.env.SESSION_SECRET || 'change_this_secret',
   resave: false,
   saveUninitialized: false,
+  rolling: true, // हर request पर cookie का expiry reset करेगा
   cookie: {
-    secure: false,
+    secure: false, // production में true कर देना (https)
     httpOnly: true,
-    maxAge: 1000 * 60 * 1
+    maxAge: SESSION_IDLE_TIME
   }
 }));
 
-
-app.use(express.urlencoded({extended: true}));
-
-app.use(express.json());
-
-app.use(express.static("public", {
-  etag: false, 
-  lastModified: false, 
-  setHeaders: (res, path) => {
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-
-  }
-}));
-
-
-
-app.set("view engine", 'ejs');
-
-app.get('/login', (req, res) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  console.log(req.session); 
-  res.render('index', { message: null });  // ✅ yahan message bhej
-});
-
+// helper: client IP
 app.use((req, res, next) => {
-  console.log('Session:', req.session);
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  req.clientIP = ip;
+  console.log("Client IP:", ip);
   next();
 });
 
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
+// static files
+app.use(express.static("public", {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res, path) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  }
+}));
+
+app.set("view engine", 'ejs');
+
+// global cache headers (to avoid back-button loop)
 app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
+// message middleware: session.message -> res.locals.message (one-time)
+app.use((req, res, next) => {
+  if (req.session && req.session.message) {
+    res.locals.message = req.session.message;
+    delete req.session.message;
+  } else {
+    res.locals.message = null;
+  }
+  next();
+});
+
+// debug logs
+app.use((req, res, next) => {
+  console.log('Session:', req.session);
   console.log(`${req.method} ${req.url}`);
   next();
 });
 
-app.get('/protected-route', (req, res) => {
-  if (!req.session || !req.session.user) {
-    return res.status(401).redirect('/login');
-  }
+// root -> login
+app.get('/', (req, res) => {
+  return res.redirect('/login');
+});
 
-  const email = req.session.user.email;
-  res.render('home', { email });  
+// safe isAuthenticated
+function isAuthenticated(req, res, next) {
+  if (req && req.session && req.session.user) return next();
+  if (req && req.session) {
+    // remove stale user
+    req.session.user = undefined;
+  }
+  return res.redirect('/login');
+}
+
+// ----------------- Routes -----------------
+
+app.get('/login', (req, res) => {
+  // if already logged in -> home
+  if (req.session && req.session.user) return res.redirect('/home');
+  res.render('index', { message: res.locals.message || null });
+});
+
+app.get('/register', (req, res) => {
+  if (req.session && req.session.user) return res.redirect('/home');
+  res.render('register', { message: res.locals.message || null });
+});
+
+app.get('/Forgotpassword', (req, res) => {
+  if (req.session && req.session.user) return res.redirect('/home');
+  res.render('Forgotpassword', { error: null, message: res.locals.message || null });
 });
 
 app.get('/',(req, res) =>{
@@ -121,196 +137,197 @@ app.get('/service',(req, res) =>{
     res.render('contact')
 });
 
-app.get('/delete-user',(req, res) =>{
-    res.render('DeleteUser')
+app.get('/delete-user', isAuthenticated, (req, res) => {
+  res.render('DeleteUser', { error: null, message: res.locals.message || null });
 });
-
-app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.set('Pragma', 'no-cache');
-  res.set('Expires', '0');
-  next();
-});
-
-
-
- app.get('/register', (req, res)=>{
-        res.render('register')
-    });
-
-    app.get('/Forgotpassword', (req, res) =>{
-        res.render('Forgotpassword')
-    });
-
 
 app.get('/home', isAuthenticated, (req, res) => {
-  console.log(req.session); 
-  res.render('home', { user: req.session.user });
+  console.log(req.session);
+  res.render('home', { user: req.session.user, message: res.locals.message || null });
 });
 
-
-
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('कुछ गलत हो गया!');
-});
-
-
-
-
-function isAuthenticated(req, res, next ){
-    if(req.session.user){
-        return next();}
-    res.redirect('/login');
-}
-
-
-
-app.post('/register', async (req, res) => {
-    try {
-        const { username, email, password, dob, gender } = req.body;
-
-        if (!username || !email || !password || password.length < 8) {
-            return res.status(400).render('register', { 
-                message: 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए और सभी fields भरें' 
-            });
-        }
-
-        const existingUser = await userModel.findOne({ email });
-        if (existingUser) {
-            return res.status(400).render('register', { 
-                message: 'ईमेल पहले से उपयोग में है' 
-            });
-        }
-
-    
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newUser = await userModel.create({
-            username,
-            email,
-            password: hashedPassword,
-            dob,
-            gender,
-        });
-
-        req.session.user = {
-            id: newUser._id,
-            username: newUser.username,
-            email: newUser.email
-        };
-
-        res.redirect('/home');
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).render('register', { 
-            message: 'रजिस्ट्रेशन असफल, कृपया फिर से प्रयास करें' 
-        });
-    }
-});
-
-
-
-     
-app.post('/Forgotpassword', async (req, res) => {
-    try {
-        const {email, username, newPassword} = req.body;
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        const user = await userModel.findOneAndUpdate(
-            { email,username},
-            { password: hashedPassword }
-        );
-
-        if (!user) {
-            return res.status(404).render('Forgotpassword', {
-                error: 'यूजर नहीं मिला'
-            });
-        }
-
-        res.redirect('/login');
-    } catch (error) {
-        console.error(error);
-        res.status(500).render('Forgotpassword', {
-            error: 'पासवर्ड रीसेट असफल'
-        });
-    }
-});
-
-
-
-app.post('/delete-user', isAuthenticated, async (req, res) => {
-
-  const {email,password} = req.body;
-
-  const user = await userModel.findOne({email});
-
-  if(!user){
-return res.status(404).send("User Not Found");
-
+app.get('/protected-route', (req, res) => {
+  if (!req.session || !req.session.user) {
+    return res.status(401).redirect('/login');
   }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {return res.status(401).send("Incorrect password");}
-
-  await userModel.findOneAndDelete({email:user.email});
-
-  req.session.destroy();
-
-  res.redirect('/register');
-
+  const email = req.session.user.email;
+  res.render('home', { email });
 });
 
+// ----------------- Register -----------------
+app.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, dob, gender } = req.body;
 
-app.post('/login', async (req, res) => {
+    // validation
+    if (!username || !email || !password || password.length < 8) {
+      req.session.message = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए और सभी fields भरें';
+      return res.redirect('/register');
+    }
+
+    const existingUser = await userModel.findOne({ email });
+    if (existingUser) {
+      // email already registered -> redirect to login
+      req.session.message = 'यह ईमेल पहले से रजिस्टर्ड है — कृपया लॉगिन करें';
+      return res.redirect('/login');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await userModel.create({
+      username,
+      email,
+      password: hashedPassword,
+      dob,
+      gender,
+      isVerified: true // OTP नहीं चाहिए तो true
+    });
+
+    req.session.user = {
+      id: newUser._id,
+      username: newUser.username,
+      email: newUser.email
+    };
+
+    return res.redirect('/home');
+
+  } catch (error) {
+    console.error('Register error:', error);
+    if (error.code === 11000) {
+      req.session.message = 'ईमेल पहले से मौजूद है';
+      return res.redirect('/login');
+    }
+    req.session.message = 'रजिस्ट्रेशन असफल, कृपया फिर से प्रयास करें';
+    return res.redirect('/register');
+  }
+});
+
+// ----------------- Forgot password (simple update) -----------------
+app.post('/Forgotpassword', async (req, res) => {
+  try {
+    const { email, username, newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      req.session.message = 'नया पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
+      return res.redirect('/Forgotpassword');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const user = await userModel.findOneAndUpdate(
+      { email, username },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!user) {
+      req.session.message = 'यूजर नहीं मिला';
+      return res.redirect('/Forgotpassword');
+    }
+
+    req.session.message = 'पासवर्ड बदल दिया गया है, कृपया लॉगिन करें';
+    return res.redirect('/login');
+  } catch (error) {
+    console.error('Forgotpassword error:', error);
+    req.session.message = 'पासवर्ड रीसेट असफल';
+    return res.redirect('/Forgotpassword');
+  }
+});
+
+// ----------------- Delete user -----------------
+app.post('/delete-user', isAuthenticated, async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await userModel.findOne({ email });
     if (!user) {
-      return res.status(404).render('index', { message: "User Not Found" });
+      req.session.message = 'User नहीं मिला';
+      return res.redirect('/home');
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).render('index', { message: "Incorrect Password" });
+      req.session.message = 'गलत पासवर्ड';
+      return res.redirect('/home');
     }
 
+    await userModel.findOneAndDelete({ _id: user._id });
+
+    req.session.destroy(err => {
+      if (err) console.error('Session destroy error:', err);
+      return res.redirect('/register');
+    });
+
+  } catch (error) {
+    console.error('Delete error:', error);
+    req.session.message = 'Account delete करने में त्रुटि';
+    return res.redirect('/home');
+  }
+});
+
+// ----------------- Login -----------------
+app.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      req.session.message = 'ईमेल और पासवर्ड दोनों भरें';
+      return res.redirect('/login');
+    }
+
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      // email not registered -> redirect to register
+      req.session.message = 'यह ईमेल रजिस्टर्ड नहीं है — कृपया पहले रजिस्टर करें';
+      return res.redirect('/register');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      req.session.message = 'Incorrect Password';
+      return res.redirect('/login');
+    }
+
+    // success
     req.session.user = {
       id: user._id,
       username: user.username,
       email: user.email
     };
 
+    // save then redirect
     req.session.save(err => {
       if (err) {
         console.error('Session save error:', err);
-        return res.status(500).send('Internal Server Error');
+        req.session.message = 'Session save failed';
+        return res.redirect('/login');
       }
-
-      console.log("✅ Session saved:", req.session.user);
-      res.redirect('/home');
+      console.log('✅ Session saved:', req.session.user);
+      return res.redirect('/home');
     });
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).send('Login Failed');
+    req.session.message = 'Login failed, try again';
+    return res.redirect('/login');
   }
 });
 
-
-
+// ----------------- Logout -----------------
 app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
+  req.session.destroy(err => {
+    if (err) console.error('Logout destroy error:', err);
+    return res.redirect('/login');
+  });
 });
 
+// ----------------- Error handler -----------------
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  return res.status(500).send('कुछ गलत हो गया!');
+});
 
-const PORT=process.env.PORT||3000;
-
-app.listen(PORT,()=>{
-console.log(`Server Running On http://localhost:${PORT}`);
-
+// start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server Running On http://localhost:${PORT}`);
 });
