@@ -15,27 +15,26 @@ require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
 
 const app = express();
 
+mongoose.set('strictQuery',false);
+
 
 // session setup
-const MongoStore = require("connect-mongo")(session);
+const MongoStore = require("connect-mongo");
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || "change_this",
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: new MongoStore({
-    url: process.env.MONGO_URL,  // <-- यही तेरा Atlas URL है
-    ttl: 14 * 24 * 60 * 60       // 14 days
-  }),
+  rolling: true,            // हर request पर timeout reset हो जाएगा
   cookie: {
-    secure: false,              // Render पर true कर देना (HTTPS)
     httpOnly: true,
-    maxAge: 1000 * 60 * 60      // 1 hour
+    secure: false,          // production + https पर true कर दे
+    maxAge: 1 * 60 * 1000   // 1 minute (idle timeout)
   }
 }));
 
 // अगर behind proxy (Heroku/Render) तो true रहे
-app.set('trust proxy', 1);
+app.set('trust proxy',1);
 
 app.use(helmet());
 app.use(morgan('dev'));
