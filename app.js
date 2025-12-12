@@ -1,6 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const mongoose = require('mongoose');
+mongoose.set('debug', true);        // mongoose queries logs दिखेंगे
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
@@ -15,11 +16,23 @@ require('dotenv').config({ path: '/home/shiv-kumar/Desktop/models/.env' });
 
 const app = express();
 
+
+
 mongoose.set('strictQuery',false);
 
 
 // session setup
 const MongoStore = require("connect-mongo");
+
+mongoose.connection.on('connected', () => {
+  console.log('Mongoose connection state: connected');
+});
+mongoose.connection.on('error', (err) => {
+  console.error('Mongoose connection error:', err);
+});
+mongoose.connection.on('disconnected', () => {
+  console.log('Mongoose disconnected');
+});
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
@@ -172,34 +185,27 @@ app.get('/protected-route', (req, res) => {
 
 // ----------------- Register -----------------
 app.post('/register', async (req, res) => {
-  try {
-    // sanitize + normalize
-    let { username, email, password, dob, gender } = req.body || {};
-    username = (username || '').trim();
-    email = (email || '').trim().toLowerCase();
-    password = password || '';
+  try { console.log("DEBUG register req.body =",req.body)
+    const { username, email, password, dob, gender } = req.body;
+    console.log('Register request body:', req.body);
 
-    console.log('Register attempt:', { username, email, dob, gender });
-
-    // validation
-    if (!username || !email || !password) {
-      req.session.message = 'सभी fields भरें';
-      return res.redirect('/register');
-    }
-    if (password.length < 8) {
-      req.session.message = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
+    if (!username || !email || !password || password.length < 8) {
+      console.log('Validation failed');
+      req.session.message = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए और सभी fields भरें';
       return res.redirect('/register');
     }
 
-    // check existing
-    const existingUser = await userModel.findOne({ email });
+    // debug: check DB connection readyState
+    console.log('Mongoose readyState:', mongoose.connection.readyState); // 1 means connected
+
+    const existingUser = await userModel.findOne({ email }).exec();
+    console.log('existingUser result:', existingUser);
+
     if (existingUser) {
-      // अगर ईमेल पहले से है -> यूजर को लॉगिन पर भेजो
       req.session.message = 'यह ईमेल पहले से रजिस्टर्ड है — कृपया लॉगिन करें';
       return res.redirect('/login');
     }
 
-    // hash and create
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await userModel.create({
@@ -211,34 +217,22 @@ app.post('/register', async (req, res) => {
       isVerified: true
     });
 
-    console.log('User created:', newUser._id);
-
-    // set session and redirect
+    console.log('User created:', newUser._id, newUser.email);
     req.session.user = {
       id: newUser._id,
       username: newUser.username,
       email: newUser.email
     };
 
-    // save session (optional, but good for safety) then redirect
-    req.session.save(err => {
-      if (err) {
-        console.error('Session save error after register:', err);
-        // phir bhi home bhej de
-        return res.redirect('/home');
-      }
-      return res.redirect('/home');
-    });
+    return res.redirect('/home');
 
   } catch (error) {
-    console.error('Register error:', error);
-
-    // duplicate key from mongoose (race)
+    console.error('Register error (detailed):', error);
+    // If duplicate key
     if (error && error.code === 11000) {
       req.session.message = 'ईमेल पहले से मौजूद है';
       return res.redirect('/login');
     }
-
     req.session.message = 'रजिस्ट्रेशन असफल, कृपया फिर से प्रयास करें';
     return res.redirect('/register');
   }
