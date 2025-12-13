@@ -1,35 +1,229 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Registration Form</title>
-<link rel="stylesheet" href="stylee.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Form</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .registration-container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .registration-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .registration-header h2 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .registration-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .form-group .input-icon {
+            position: absolute;
+            right: 15px;
+            top: 40px;
+            color: #999;
+        }
+
+        .password-strength {
+            height: 4px;
+            background: #eee;
+            margin-top: 8px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            background: #ff4757;
+            transition: width 0.3s;
+        }
+
+        .terms-group {
+            display: flex;
+            align-items: flex-start;
+            margin: 25px 0;
+        }
+
+        .terms-group input {
+            margin-right: 10px;
+            margin-top: 3px;
+        }
+
+        .terms-group label {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .terms-group a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .terms-group a:hover {
+            text-decoration: underline;
+        }
+
+        .register-button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(to right, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .register-button:hover {
+            background: linear-gradient(to right, #5a6fd1, #6a4299);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: 25px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            .registration-container {
+                padding: 30px 20px;
+            }
+        }
+    </style>
 </head>
 <body>
-
-<h2>Registration Form</h2>
-<form action="/register" method="POST">
-  <label>User Name</label>
-  <input type="text" name="username" required>
-
-  <label>Email</label>
-  <input type="email" name="email" required>
-
-  <label>Password</label>
-  <input type="password" name="password" required>
-
-  <label>Gender</label>
+    <div class="registration-container">
+        <div class="registration-header">
+            <h2>Create Your Account</h2>
+            <p>Join our community today</p>
+        </div>
+        
+        <form action="/register" method="post">
+            <div class="form-group">
+                <label>User Name</label>
+               <input type="text" name="username" placeholder="Enter User Name">
+                <span class="input-icon">^</span>
+            </div>
+            
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" name="email" placeholder="Enter Email">
+                <span class="input-icon">✉️</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" name="password" placeholder="Enter Password" minlength="8">
+                <span class="input-icon">🔒</span>
+                <div class="password-strength">
+                    <div class="password-strength-bar" id="password-strength-bar"></div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+             <center>  <label>Gender</label>
   <select name="gender" required>
     <option value="">Select</option>
     <option value="male">Male</option>
     <option value="female">Female</option>
-  </select>
+  </select> </center>
+                <span class="input-icon">👤</span>
+            </div>
 
-  <label>Date of Birth</label>
-  <input type="date" name="dob" required>
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" name="dob" required>
+                <span class="input-icon">✉️</span>
+            </div>
+            <button type="submit" class="register-button">Register Now</button>
+            
+            <div class="login-link">
+                Already have an account? <a href="/login">Sign in</a>
+            </div>
+        </form>
+    </div>
 
-  <button type="submit">Register</button>
-</form>
-<center><p>Already have an account? <a href="/login">Login here</a></p></center>
-
+    </script>
 </body>
 </html>
