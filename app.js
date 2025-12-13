@@ -112,7 +112,7 @@ app.use((req, res, next) => {
 
 // root -> login
 app.get('/', (req, res) => {
-  return res.redirect('/login');
+  return res.render('front-page');
 });
 
 // safe isAuthenticated
